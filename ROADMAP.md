@@ -1,6 +1,6 @@
 # Roadmap — whaleshell-providers
 
-Status: **v0.1.0-alpha.1** (alpha) · Depends on [whaleshell-core](https://github.com/whaleshell/whaleshell-core) `v0.1.0-alpha.1`
+Status: **v0.1.0-alpha.2** (alpha) · Depends on [whaleshell-core](https://github.com/whaleshell/whaleshell-core) `v0.1.0-alpha.2`
 
 ## This module
 
@@ -12,4 +12,4 @@ Status: **v0.1.0-alpha.1** (alpha) · Depends on [whaleshell-core](https://githu
 
 ## Release
 
-Requires whaleshell-core `v0.1.0-alpha.1` · tagged after core in the cascade.
+Requires whaleshell-core `v0.1.0-alpha.2` · tagged after core in the cascade.
