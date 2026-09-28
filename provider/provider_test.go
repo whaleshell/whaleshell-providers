@@ -143,6 +143,48 @@ func TestProfileParserRejectsUnsupportedFields(t *testing.T) {
 	}
 }
 
+func TestRuntimeValidationReportsUnsupportedTokenGrant(t *testing.T) {
+	profile := Profile{ID: "exchange", Credentials: []Credential{{
+		Name:       "access_token",
+		TokenGrant: &TokenGrant{GrantType: "token_exchange", TokenEndpoint: "https://issuer.example/token"},
+	}}}
+	if err := profile.Validate(); err != nil {
+		t.Fatalf("schema validation: %v", err)
+	}
+	if err := profile.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "credentials[0].token_grant") {
+		t.Fatalf("runtime validation should identify unsupported token_grant, got %v", err)
+	}
+}
+
+func TestProfileRejectsInsecurePublicTokenEndpoint(t *testing.T) {
+	for _, endpoint := range []string{"http://issuer.example/token", "file:///tmp/token", "https://user:pass@issuer.example/token"} {
+		profile := Profile{ID: "sample", Credentials: []Credential{{
+			Name: "access_token", EnvVars: []string{"ACCESS_TOKEN"},
+			Refresh: &CredentialRefresh{Strategy: "oauth2_refresh_token", TokenURL: endpoint},
+		}}}
+		if err := profile.Validate(); err == nil || !strings.Contains(err.Error(), "refresh.token_url") {
+			t.Errorf("endpoint %q should be rejected with a token_url diagnostic, got %v", endpoint, err)
+		}
+	}
+}
+
+func TestProfileRejectsL7CredentialInspectionWithTLSPassthrough(t *testing.T) {
+	doc := []byte(`id: sample
+credentials:
+  - name: api_key
+    env_vars: [API_KEY]
+endpoints:
+  - host: api.example.com
+    port: 443
+    protocol: rest
+    tls: passthrough
+    access: read-write
+`)
+	if _, err := ParseYAML(doc); err == nil || !strings.Contains(err.Error(), "tls: terminate") {
+		t.Fatalf("expected fail-closed TLS validation, got %v", err)
+	}
+}
+
 func TestLoadDirRejectsDuplicateProfileIDs(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"a.yaml", "b.yaml"} {

@@ -4,6 +4,7 @@ package provider
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,14 +162,27 @@ func (p Profile) Validate() error {
 			return fmt.Errorf("provider profile %q: credentials[%d].path_template is required for auth_style path", id, i)
 		}
 		if c.Refresh != nil {
+			if c.Refresh.RefreshBeforeSeconds < 0 || c.Refresh.MaxLifetimeSeconds < 0 {
+				return fmt.Errorf("provider profile %q: credentials[%d].refresh lifetimes must be non-negative", id, i)
+			}
 			switch c.Refresh.Strategy {
 			case "static", "external", "oauth2_refresh_token", "oauth2_client_credentials", "google_service_account_jwt", "aws_sts_assume_role":
 			default:
 				return fmt.Errorf("provider profile %q: credentials[%d].refresh.strategy %q is unsupported", id, i, c.Refresh.Strategy)
 			}
+			if c.Refresh.TokenURL != "" {
+				if err := validateTokenEndpoint(c.Refresh.TokenURL); err != nil {
+					return fmt.Errorf("provider profile %q: credentials[%d].refresh.token_url: %w", id, i, err)
+				}
+			}
 		}
-		if c.TokenGrant != nil && c.TokenGrant.GrantType != "client_credentials" && c.TokenGrant.GrantType != "token_exchange" {
-			return fmt.Errorf("provider profile %q: credentials[%d].token_grant.grant_type %q is unsupported", id, i, c.TokenGrant.GrantType)
+		if c.TokenGrant != nil {
+			if c.TokenGrant.GrantType != "client_credentials" && c.TokenGrant.GrantType != "token_exchange" && c.TokenGrant.GrantType != "ClientCredentials" && c.TokenGrant.GrantType != "TokenExchange" {
+				return fmt.Errorf("provider profile %q: credentials[%d].token_grant.grant_type %q is unsupported", id, i, c.TokenGrant.GrantType)
+			}
+			if err := validateTokenEndpoint(c.TokenGrant.TokenEndpoint); err != nil {
+				return fmt.Errorf("provider profile %q: credentials[%d].token_grant.token_endpoint: %w", id, i, err)
+			}
 		}
 	}
 	if len(p.Discovery.Credentials) > 0 {
@@ -182,6 +196,51 @@ func (p Profile) Validate() error {
 				return fmt.Errorf("provider profile %q: duplicate discovery credential %q", id, name)
 			}
 			seen[name] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func validateTokenEndpoint(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Hostname() == "" {
+		return fmt.Errorf("must be an absolute URL with a host")
+	}
+	if u.User != nil || u.Fragment != "" {
+		return fmt.Errorf("must not contain user information or a fragment")
+	}
+	if u.Scheme == "https" {
+		return nil
+	}
+	host := strings.ToLower(u.Hostname())
+	if u.Scheme == "http" && (host == "localhost" || host == "127.0.0.1" || strings.HasSuffix(host, ".svc") || strings.HasSuffix(host, ".svc.cluster.local")) {
+		return nil
+	}
+	return fmt.Errorf("must use HTTPS (HTTP is allowed only for loopback or Kubernetes service DNS)")
+}
+
+// ValidateRuntime rejects accepted schema features that whaleshell cannot execute
+// so import/export compatibility never implies a working credential flow.
+func (p Profile) ValidateRuntime() error {
+	for i, credential := range p.Credentials {
+		if credential.TokenGrant != nil {
+			return fmt.Errorf("provider profile %q: credentials[%d].token_grant is not supported by whaleshell runtime", p.ID, i)
+		}
+		if credential.Refresh == nil {
+			continue
+		}
+		switch credential.Refresh.Strategy {
+		case "oauth2_refresh_token", "oauth2_client_credentials", "oauth2-refresh-token", "oauth2-client-credentials":
+			if strings.TrimSpace(credential.Refresh.TokenURL) == "" {
+				return fmt.Errorf("provider profile %q: credentials[%d].refresh.token_url is required by whaleshell runtime", p.ID, i)
+			}
+		default:
+			return fmt.Errorf("provider profile %q: credentials[%d].refresh.strategy %q is not supported by whaleshell runtime", p.ID, i, credential.Refresh.Strategy)
+		}
+	}
+	for i, endpoint := range p.Endpoints {
+		if endpoint.CredentialSigning != "" {
+			return fmt.Errorf("provider profile %q: endpoints[%d].credential_signing is not supported by whaleshell runtime", p.ID, i)
 		}
 	}
 	return nil
