@@ -1,9 +1,13 @@
 package provider
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/whaleshell/whaleshell-core/policy"
+	"gopkg.in/yaml.v3"
 )
 
 func TestParseGitHubProfile(t *testing.T) {
@@ -41,6 +45,113 @@ endpoints:
 	keys := p.EnvKeys()
 	if len(keys) != 2 || keys[0] != "GITHUB_TOKEN" || keys[1] != "GH_TOKEN" {
 		t.Fatalf("keys=%v", keys)
+	}
+}
+
+func TestOpenShellProviderProfileFixtures(t *testing.T) {
+	entries, err := os.ReadDir(filepath.Join("testdata", "openshell"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+		t.Run(strings.TrimSuffix(entry.Name(), ".yaml"), func(t *testing.T) {
+			p, err := LoadFile(filepath.Join("testdata", "openshell", entry.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.ID == "" {
+				t.Fatal("upstream profile id lost")
+			}
+		})
+	}
+}
+
+func TestOpenShellExtendedProfileFieldsRoundTrip(t *testing.T) {
+	input := []byte(`id: custom
+resource_version: 7
+annotations: {source: "migration"}
+credentials:
+  - name: api_key
+    env_vars: [CUSTOM_API_KEY]
+    auth_style: query
+    query_param: key
+    refresh:
+      strategy: oauth2_client_credentials
+      token_url: https://auth.example/token
+      refresh_before_seconds: 30
+      additional_outputs:
+        - {output: refresh_token, credential: refresh_token}
+    token_grant:
+      grant_type: client_credentials
+      token_endpoint: https://auth.example/token
+      audience_overrides:
+        - {host: api.example, port: 443, path: /v1/**, audience: api://custom}
+discovery:
+  credentials: [api_key]
+`)
+	p, err := ParseYAML(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ResourceVersion != 7 || p.Annotations["source"] != "migration" || p.Credentials[0].Refresh.RefreshBeforeSeconds != 30 || p.Credentials[0].TokenGrant.AudienceOverrides[0].Audience != "api://custom" {
+		t.Fatalf("OpenShell fields lost: %+v", p)
+	}
+	b, err := yaml.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseYAML(b); err != nil {
+		t.Fatalf("marshaled profile did not parse: %v", err)
+	}
+}
+
+func TestDiscoveryUsesNamedCredentialsOnly(t *testing.T) {
+	p, err := LoadFile(filepath.Join("testdata", "openshell", "codex.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range p.EnvKeys() {
+		t.Setenv(key, "")
+	}
+	t.Setenv("CODEX_AUTH_ACCESS_TOKEN", "access")
+	t.Setenv("CODEX_AUTH_REFRESH_TOKEN", "refresh")
+	t.Setenv("CODEX_AUTH_ACCOUNT_ID", "account")
+	keys, err := p.DiscoverEnvVars()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 3 {
+		t.Fatalf("optional id token should not block discovery: %v", keys)
+	}
+	t.Setenv("CODEX_AUTH_ID_TOKEN", "id")
+	keys, err = p.DiscoverEnvVars()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 4 {
+		t.Fatalf("discovered keys=%v", keys)
+	}
+}
+
+func TestProfileParserRejectsUnsupportedFields(t *testing.T) {
+	profile := []byte("id: sample\nrefresh: {strategy: oauth2-refresh-token}\n")
+	if _, err := ParseYAML(profile); err == nil || !strings.Contains(err.Error(), "field refresh not found") {
+		t.Fatalf("expected precise unsupported-field error, got %v", err)
+	}
+}
+
+func TestLoadDirRejectsDuplicateProfileIDs(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.yaml", "b.yaml"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("id: duplicate\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := LoadDir(dir); err == nil || !strings.Contains(err.Error(), "duplicate ID") {
+		t.Fatalf("expected duplicate profile error, got %v", err)
 	}
 }
 

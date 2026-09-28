@@ -14,27 +14,98 @@ import (
 
 // Profile is a reusable provider type (catalog entry).
 type Profile struct {
-	ID          string             `yaml:"id" json:"id"`
-	DisplayName string             `yaml:"display_name,omitempty" json:"display_name,omitempty"`
-	Description string             `yaml:"description,omitempty" json:"description,omitempty"`
-	Category    string             `yaml:"category,omitempty" json:"category,omitempty"`
-	Endpoints   []policy.AllowRule `yaml:"endpoints,omitempty" json:"endpoints,omitempty"`
-	Binaries    []string           `yaml:"binaries,omitempty" json:"binaries,omitempty"`
-	Credentials []Credential       `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+	ID               string             `yaml:"id" json:"id"`
+	ResourceVersion  uint64             `yaml:"resource_version,omitempty" json:"resource_version,omitempty"`
+	Annotations      map[string]string  `yaml:"annotations,omitempty" json:"annotations,omitempty"`
+	DisplayName      string             `yaml:"display_name,omitempty" json:"display_name,omitempty"`
+	Description      string             `yaml:"description,omitempty" json:"description,omitempty"`
+	Category         string             `yaml:"category,omitempty" json:"category,omitempty"`
+	InferenceCapable bool               `yaml:"inference_capable,omitempty" json:"inference_capable,omitempty"`
+	Discovery        Discovery          `yaml:"discovery,omitempty" json:"discovery,omitempty"`
+	Endpoints        []policy.AllowRule `yaml:"endpoints,omitempty" json:"endpoints,omitempty"`
+	Binaries         []string           `yaml:"binaries,omitempty" json:"binaries,omitempty"`
+	Credentials      []Credential       `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+}
+
+// Discovery selects credentials considered by --from-existing. An empty list
+// retains whaleshell's historical behavior and discovers all profile credentials.
+type Discovery struct {
+	Credentials []string `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 }
 
 // Credential declares env keys for an attached instance.
 // Values live in the gateway secret store; guests see whaleshell:resolve:env:KEY
 // placeholders unless InjectEnv is false (sidecar-only — Cursor OAuth path).
 type Credential struct {
-	Name      string   `yaml:"name" json:"name"`
-	EnvVars   []string `yaml:"env_vars,omitempty" json:"env_vars,omitempty"`
-	AuthStyle string   `yaml:"auth_style,omitempty" json:"auth_style,omitempty"` // reserved: bearer|header|basic|query|path
-	Header    string   `yaml:"header_name,omitempty" json:"header_name,omitempty"`
-	Required  bool     `yaml:"required,omitempty" json:"required,omitempty"`
+	Name         string             `yaml:"name" json:"name"`
+	Description  string             `yaml:"description,omitempty" json:"description,omitempty"`
+	EnvVars      []string           `yaml:"env_vars,omitempty" json:"env_vars,omitempty"`
+	AuthStyle    string             `yaml:"auth_style,omitempty" json:"auth_style,omitempty"`
+	Header       string             `yaml:"header_name,omitempty" json:"header_name,omitempty"`
+	QueryParam   string             `yaml:"query_param,omitempty" json:"query_param,omitempty"`
+	PathTemplate string             `yaml:"path_template,omitempty" json:"path_template,omitempty"`
+	Required     bool               `yaml:"required,omitempty" json:"required,omitempty"`
+	Secret       bool               `yaml:"secret,omitempty" json:"secret,omitempty"`
+	Refresh      *CredentialRefresh `yaml:"refresh,omitempty" json:"refresh,omitempty"`
+	TokenGrant   *TokenGrant        `yaml:"token_grant,omitempty" json:"token_grant,omitempty"`
 	// InjectEnv controls guest env placeholders. nil/omitted → true.
 	// Set false for agents that client-validate API keys (e.g. Cursor Agent).
 	InjectEnv *bool `yaml:"inject_env,omitempty" json:"inject_env,omitempty"`
+}
+
+// CredentialRefresh describes gateway-side rotation inputs. The gateway may
+// reject strategies it cannot execute, but import/export retains the contract.
+type CredentialRefresh struct {
+	Strategy             string            `yaml:"strategy" json:"strategy"`
+	TokenURL             string            `yaml:"token_url,omitempty" json:"token_url,omitempty"`
+	TokenURI             string            `yaml:"token_uri,omitempty" json:"token_uri,omitempty"`
+	Scopes               []string          `yaml:"scopes,omitempty" json:"scopes,omitempty"`
+	RefreshBefore        string            `yaml:"refresh_before,omitempty" json:"refresh_before,omitempty"`
+	MaxLifetime          string            `yaml:"max_lifetime,omitempty" json:"max_lifetime,omitempty"`
+	RefreshBeforeSeconds int64             `yaml:"refresh_before_seconds,omitempty" json:"refresh_before_seconds,omitempty"`
+	MaxLifetimeSeconds   int64             `yaml:"max_lifetime_seconds,omitempty" json:"max_lifetime_seconds,omitempty"`
+	Material             []RefreshMaterial `yaml:"material,omitempty" json:"material,omitempty"`
+	AdditionalOutputs    []RefreshOutput   `yaml:"additional_outputs,omitempty" json:"additional_outputs,omitempty"`
+}
+
+type RefreshOutput struct {
+	Output     string `yaml:"output" json:"output"`
+	Credential string `yaml:"credential" json:"credential"`
+}
+
+type RefreshMaterial struct {
+	Name        string `yaml:"name" json:"name"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Required    bool   `yaml:"required,omitempty" json:"required,omitempty"`
+	Secret      *bool  `yaml:"secret,omitempty" json:"secret,omitempty"`
+}
+
+// TokenGrant describes an optional workload-identity OAuth token exchange.
+type TokenGrant struct {
+	GrantType           string                       `yaml:"grant_type" json:"grant_type"`
+	TokenEndpoint       string                       `yaml:"token_endpoint" json:"token_endpoint"`
+	Audience            string                       `yaml:"audience,omitempty" json:"audience,omitempty"`
+	JWTSVIDAudience     string                       `yaml:"jwt_svid_audience,omitempty" json:"jwt_svid_audience,omitempty"`
+	ClientAssertionType string                       `yaml:"client_assertion_type,omitempty" json:"client_assertion_type,omitempty"`
+	Scopes              []string                     `yaml:"scopes,omitempty" json:"scopes,omitempty"`
+	CacheTTL            string                       `yaml:"cache_ttl,omitempty" json:"cache_ttl,omitempty"`
+	RequestedTokenType  string                       `yaml:"requested_token_type,omitempty" json:"requested_token_type,omitempty"`
+	SubjectToken        *SubjectToken                `yaml:"subject_token,omitempty" json:"subject_token,omitempty"`
+	AudienceOverrides   []TokenGrantAudienceOverride `yaml:"audience_overrides,omitempty" json:"audience_overrides,omitempty"`
+}
+
+type SubjectToken struct {
+	Source           string `yaml:"source" json:"source"`
+	Credential       string `yaml:"credential,omitempty" json:"credential,omitempty"`
+	SubjectTokenType string `yaml:"subject_token_type,omitempty" json:"subject_token_type,omitempty"`
+}
+
+type TokenGrantAudienceOverride struct {
+	Host     string   `yaml:"host" json:"host"`
+	Port     int      `yaml:"port" json:"port"`
+	Path     string   `yaml:"path,omitempty" json:"path,omitempty"`
+	Audience string   `yaml:"audience,omitempty" json:"audience,omitempty"`
+	Scopes   []string `yaml:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
 // Instance is a named provider on a gateway (env key refs only, no secret values).
@@ -50,27 +121,98 @@ func (p Profile) Validate() error {
 	if id == "" {
 		return fmt.Errorf("provider profile: id required")
 	}
+	if !validProfileID(id) {
+		return fmt.Errorf("provider profile %q: id must contain lowercase letters, digits, and hyphens", id)
+	}
+	category := strings.TrimSpace(p.Category)
+	switch category {
+	case "", "other", "agent", "inference", "source_control", "messaging", "data", "knowledge":
+	default:
+		return fmt.Errorf("provider profile %q: unsupported category %q", id, category)
+	}
+	credentials := map[string]Credential{}
 	for i, ep := range p.Endpoints {
 		if err := policy.ValidateAllowRule(fmt.Sprintf("endpoints[%d]", i), ep); err != nil {
 			return fmt.Errorf("provider profile %q: %w", id, err)
 		}
 	}
 	for i, c := range p.Credentials {
-		if strings.TrimSpace(c.Name) == "" {
+		name := strings.TrimSpace(c.Name)
+		if name == "" {
 			return fmt.Errorf("provider profile %q: credentials[%d]: name required", id, i)
 		}
-		if len(c.EnvVars) == 0 {
+		if len(c.EnvVars) == 0 && c.Refresh == nil && c.TokenGrant == nil {
 			return fmt.Errorf("provider profile %q: credentials[%d]: env_vars required", id, i)
+		}
+		if _, exists := credentials[name]; exists {
+			return fmt.Errorf("provider profile %q: duplicate credential %q", id, name)
+		}
+		credentials[name] = c
+		if c.AuthStyle != "" && c.AuthStyle != "basic" && c.AuthStyle != "bearer" && c.AuthStyle != "header" && c.AuthStyle != "query" && c.AuthStyle != "path" {
+			return fmt.Errorf("provider profile %q: credentials[%d].auth_style %q is unsupported (supported: basic, bearer, header, query, path)", id, i, c.AuthStyle)
+		}
+		if c.AuthStyle == "header" && strings.TrimSpace(c.Header) == "" {
+			return fmt.Errorf("provider profile %q: credentials[%d].header_name is required for auth_style header", id, i)
+		}
+		if c.AuthStyle == "query" && strings.TrimSpace(c.QueryParam) == "" {
+			return fmt.Errorf("provider profile %q: credentials[%d].query_param is required for auth_style query", id, i)
+		}
+		if c.AuthStyle == "path" && strings.TrimSpace(c.PathTemplate) == "" {
+			return fmt.Errorf("provider profile %q: credentials[%d].path_template is required for auth_style path", id, i)
+		}
+		if c.Refresh != nil {
+			switch c.Refresh.Strategy {
+			case "static", "external", "oauth2_refresh_token", "oauth2_client_credentials", "google_service_account_jwt", "aws_sts_assume_role":
+			default:
+				return fmt.Errorf("provider profile %q: credentials[%d].refresh.strategy %q is unsupported", id, i, c.Refresh.Strategy)
+			}
+		}
+		if c.TokenGrant != nil && c.TokenGrant.GrantType != "client_credentials" && c.TokenGrant.GrantType != "token_exchange" {
+			return fmt.Errorf("provider profile %q: credentials[%d].token_grant.grant_type %q is unsupported", id, i, c.TokenGrant.GrantType)
+		}
+	}
+	if len(p.Discovery.Credentials) > 0 {
+		seen := map[string]struct{}{}
+		for _, name := range p.Discovery.Credentials {
+			name = strings.TrimSpace(name)
+			if _, ok := credentials[name]; !ok {
+				return fmt.Errorf("provider profile %q: discovery references unknown credential %q", id, name)
+			}
+			if _, ok := seen[name]; ok {
+				return fmt.Errorf("provider profile %q: duplicate discovery credential %q", id, name)
+			}
+			seen[name] = struct{}{}
 		}
 	}
 	return nil
 }
 
+func validProfileID(id string) bool {
+	if id == "" || id[0] == '-' || id[len(id)-1] == '-' {
+		return false
+	}
+	for _, r := range id {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+			return false
+		}
+	}
+	return true
+}
+
 // ParseYAML loads a profile from bytes.
 func ParseYAML(b []byte) (Profile, error) {
 	var p Profile
-	if err := yaml.Unmarshal(b, &p); err != nil {
+	dec := yaml.NewDecoder(strings.NewReader(string(b)))
+	dec.KnownFields(true)
+	if err := dec.Decode(&p); err != nil {
 		return Profile{}, fmt.Errorf("provider profile: parse: %w", err)
+	}
+	// OpenShell omits TLS handling on L7 HTTPS endpoints and defaults them to
+	// inspection. Apply that default before whaleshell policy validation.
+	for i := range p.Endpoints {
+		if p.Endpoints[i].TLS == "" && p.Endpoints[i].Protocol != "" && p.Endpoints[i].Port == 443 {
+			p.Endpoints[i].TLS = "terminate"
+		}
 	}
 	if err := p.Validate(); err != nil {
 		return Profile{}, err
@@ -106,6 +248,9 @@ func LoadDir(dir string) (map[string]Profile, error) {
 		if err != nil {
 			return nil, err
 		}
+		if _, exists := out[p.ID]; exists {
+			return nil, fmt.Errorf("provider profile %q: duplicate ID in %s", p.ID, dir)
+		}
 		out[p.ID] = p
 	}
 	return out, nil
@@ -126,6 +271,24 @@ func (p Profile) EnvKeys() []string {
 			}
 			seen[k] = struct{}{}
 			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// DiscoveryCredentials returns the selected credential definitions in profile order.
+func (p Profile) DiscoveryCredentials() []Credential {
+	if len(p.Discovery.Credentials) == 0 {
+		return append([]Credential(nil), p.Credentials...)
+	}
+	byName := make(map[string]Credential, len(p.Credentials))
+	for _, credential := range p.Credentials {
+		byName[credential.Name] = credential
+	}
+	out := make([]Credential, 0, len(p.Discovery.Credentials))
+	for _, name := range p.Discovery.Credentials {
+		if credential, ok := byName[name]; ok {
+			out = append(out, credential)
 		}
 	}
 	return out
@@ -161,7 +324,7 @@ func (p Profile) GuestEnvKeys() []string {
 func (p Profile) DiscoverEnvVars() ([]string, error) {
 	var out []string
 	seen := map[string]struct{}{}
-	for _, c := range p.Credentials {
+	for _, c := range p.DiscoveryCredentials() {
 		found := ""
 		for _, k := range c.EnvVars {
 			k = strings.TrimSpace(k)
