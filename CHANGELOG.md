@@ -2,8 +2,16 @@
 
 ## [Unreleased]
 
-## [v0.1.0-alpha.2] - 2026-09-28
+## [v0.1.0-alpha.2] - 2026-10-07
 
 ### Added
 
 - Parse and validate the pinned OpenShell provider profile schema, including discovery, credential metadata, and explicit runtime capability diagnostics.
+- Resolve sandbox-scoped credential bindings during provider policy composition, rejecting unresolved or ambiguous references.
+
+### Changed
+
+- Match OpenShell discovery behavior: use only declared discovery credentials, collect every non-empty environment alias, and treat an empty discovery list as no discovery.
+- Preserve `source` and `scope` metadata while leaving catalog authority to the gateway.
+- Reject profile endpoint bindings and unsupported token-grant combinations during validation.
+- Correct the standalone module checksums after publishing the core dependency.

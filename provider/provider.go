@@ -4,6 +4,7 @@ package provider
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -15,21 +16,25 @@ import (
 
 // Profile is a reusable provider type (catalog entry).
 type Profile struct {
-	ID               string             `yaml:"id" json:"id"`
-	ResourceVersion  uint64             `yaml:"resource_version,omitempty" json:"resource_version,omitempty"`
-	Annotations      map[string]string  `yaml:"annotations,omitempty" json:"annotations,omitempty"`
+	ID              string            `yaml:"id" json:"id"`
+	ResourceVersion uint64            `yaml:"resource_version,omitempty" json:"resource_version,omitempty"`
+	Annotations     map[string]string `yaml:"annotations,omitempty" json:"annotations,omitempty"`
+	// Source and Scope are server-set OpenShell metadata. They are retained for
+	// config round-trips; catalog provenance and visibility come from the gateway.
+	Source           string             `yaml:"source,omitempty" json:"source,omitempty"`
+	Scope            string             `yaml:"scope,omitempty" json:"scope,omitempty"`
 	DisplayName      string             `yaml:"display_name,omitempty" json:"display_name,omitempty"`
 	Description      string             `yaml:"description,omitempty" json:"description,omitempty"`
 	Category         string             `yaml:"category,omitempty" json:"category,omitempty"`
 	InferenceCapable bool               `yaml:"inference_capable,omitempty" json:"inference_capable,omitempty"`
-	Discovery        Discovery          `yaml:"discovery,omitempty" json:"discovery,omitempty"`
+	Discovery        Discovery          `yaml:"discovery,omitempty" json:"discovery"`
 	Endpoints        []policy.AllowRule `yaml:"endpoints,omitempty" json:"endpoints,omitempty"`
 	Binaries         []string           `yaml:"binaries,omitempty" json:"binaries,omitempty"`
 	Credentials      []Credential       `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 }
 
 // Discovery selects credentials considered by --from-existing. An empty list
-// retains whaleshell's historical behavior and discovers all profile credentials.
+// disables credential environment discovery, as in the pinned OpenShell contract.
 type Discovery struct {
 	Credentials []string `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 }
@@ -133,6 +138,9 @@ func (p Profile) Validate() error {
 	}
 	credentials := map[string]Credential{}
 	for i, ep := range p.Endpoints {
+		if ep.CredentialBinding != nil {
+			return fmt.Errorf("provider profile %q: endpoints[%d].credential_binding is sandbox-scoped and cannot be used in a profile", id, i)
+		}
 		if err := policy.ValidateAllowRule(fmt.Sprintf("endpoints[%d]", i), ep); err != nil {
 			return fmt.Errorf("provider profile %q: %w", id, err)
 		}
@@ -224,7 +232,26 @@ func validateTokenEndpoint(raw string) error {
 func (p Profile) ValidateRuntime() error {
 	for i, credential := range p.Credentials {
 		if credential.TokenGrant != nil {
-			return fmt.Errorf("provider profile %q: credentials[%d].token_grant is not supported by whaleshell runtime", p.ID, i)
+			grant := strings.ToLower(strings.ReplaceAll(credential.TokenGrant.GrantType, "-", "_"))
+			switch grant {
+			case "client_credentials":
+			case "token_exchange":
+				if credential.TokenGrant.SubjectToken == nil || credential.TokenGrant.SubjectToken.Source != "provider_credential" || strings.TrimSpace(credential.TokenGrant.SubjectToken.Credential) == "" {
+					return fmt.Errorf("provider profile %q: credentials[%d].token_grant requires a provider_credential subject_token", p.ID, i)
+				}
+				declared := false
+				for _, candidate := range p.Credentials {
+					if candidate.Name == credential.TokenGrant.SubjectToken.Credential {
+						declared = true
+						break
+					}
+				}
+				if !declared {
+					return fmt.Errorf("provider profile %q: credentials[%d].token_grant references undeclared subject credential %q", p.ID, i, credential.TokenGrant.SubjectToken.Credential)
+				}
+			default:
+				return fmt.Errorf("provider profile %q: credentials[%d].token_grant.grant_type %q is not supported by whaleshell runtime", p.ID, i, credential.TokenGrant.GrantType)
+			}
 		}
 		if credential.Refresh == nil {
 			continue
@@ -234,6 +261,7 @@ func (p Profile) ValidateRuntime() error {
 			if strings.TrimSpace(credential.Refresh.TokenURL) == "" {
 				return fmt.Errorf("provider profile %q: credentials[%d].refresh.token_url is required by whaleshell runtime", p.ID, i)
 			}
+		case "aws_sts_assume_role", "aws-sts-assume-role", "google_service_account_jwt", "google-service-account-jwt":
 		default:
 			return fmt.Errorf("provider profile %q: credentials[%d].refresh.strategy %q is not supported by whaleshell runtime", p.ID, i, credential.Refresh.Strategy)
 		}
@@ -266,6 +294,13 @@ func ParseYAML(b []byte) (Profile, error) {
 	if err := dec.Decode(&p); err != nil {
 		return Profile{}, fmt.Errorf("provider profile: parse: %w", err)
 	}
+	var trailing any
+	if err := dec.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return Profile{}, fmt.Errorf("provider profile: parse: multiple YAML documents are not supported")
+		}
+		return Profile{}, fmt.Errorf("provider profile: parse trailing document: %w", err)
+	}
 	// OpenShell omits TLS handling on L7 HTTPS endpoints and defaults them to
 	// inspection. Apply that default before whaleshell policy validation.
 	for i := range p.Endpoints {
@@ -288,13 +323,16 @@ func LoadFile(path string) (Profile, error) {
 	return ParseYAML(b)
 }
 
+// Catalog maps profile IDs to their validated definitions.
+type Catalog = map[string]Profile
+
 // LoadDir loads all *.yaml/*.yml profiles from a directory (non-recursive).
-func LoadDir(dir string) (map[string]Profile, error) {
+func LoadDir(dir string) (Catalog, error) {
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	out := map[string]Profile{}
+	out := Catalog{}
 	for _, e := range ents {
 		if e.IsDir() {
 			continue
@@ -335,18 +373,15 @@ func (p Profile) EnvKeys() []string {
 	return out
 }
 
-// DiscoveryCredentials returns the selected credential definitions in profile order.
+// DiscoveryCredentials returns the selected credential definitions in discovery order.
 func (p Profile) DiscoveryCredentials() []Credential {
-	if len(p.Discovery.Credentials) == 0 {
-		return append([]Credential(nil), p.Credentials...)
-	}
 	byName := make(map[string]Credential, len(p.Credentials))
 	for _, credential := range p.Credentials {
-		byName[credential.Name] = credential
+		byName[strings.TrimSpace(credential.Name)] = credential
 	}
 	out := make([]Credential, 0, len(p.Discovery.Credentials))
 	for _, name := range p.Discovery.Credentials {
-		if credential, ok := byName[name]; ok {
+		if credential, ok := byName[strings.TrimSpace(name)]; ok {
 			out = append(out, credential)
 		}
 	}
@@ -378,45 +413,51 @@ func (p Profile) GuestEnvKeys() []string {
 }
 
 // DiscoverEnvVars picks host env keys for a provider instance (OpenShell --from-existing).
-// For each credential, the first non-empty env_vars entry wins. Required credentials
-// with no value on the host return an error. Values are never returned — only key names.
+// Every non-empty alias of each selected credential is discovered. Required flags
+// do not restrict discovery. Empty discovery is
+// successful with no matches. Values are never returned — only key names.
 func (p Profile) DiscoverEnvVars() ([]string, error) {
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
 	var out []string
 	seen := map[string]struct{}{}
 	for _, c := range p.DiscoveryCredentials() {
-		found := ""
 		for _, k := range c.EnvVars {
 			k = strings.TrimSpace(k)
 			if k == "" {
 				continue
 			}
+			if _, scanned := seen[k]; scanned {
+				continue
+			}
+			seen[k] = struct{}{}
 			if v, ok := os.LookupEnv(k); ok && strings.TrimSpace(v) != "" {
 				// Host may leak guest placeholders into the process env — treat as missing.
 				if strings.HasPrefix(strings.TrimSpace(v), "whaleshell:resolve:env:") ||
 					strings.HasPrefix(strings.TrimSpace(v), "openshell:resolve:env:") {
 					continue
 				}
-				found = k
-				break
+				out = append(out, k)
 			}
 		}
-		if found == "" {
-			if c.Required {
-				want := strings.Join(c.EnvVars, "|")
-				return nil, fmt.Errorf("provider %q: credential %q missing on host (export %s)", p.ID, c.Name, want)
-			}
-			continue
-		}
-		if _, ok := seen[found]; ok {
-			continue
-		}
-		seen[found] = struct{}{}
-		out = append(out, found)
-	}
-	if len(out) == 0 && len(p.Credentials) > 0 {
-		return nil, fmt.Errorf("provider %q: no credential env vars found on host", p.ID)
 	}
 	return out, nil
+}
+
+// DiscoverConfig collects the non-secret configuration variables discovered by
+// the pinned OpenShell Vertex AI profile. Other profiles discover no config.
+func (p Profile) DiscoverConfig() map[string]string {
+	if p.ID != "google-vertex-ai" {
+		return nil
+	}
+	config := map[string]string{}
+	for _, key := range []string{"VERTEX_AI_PROJECT_ID", "VERTEX_AI_REGION", "GOOGLE_VERTEX_AI_BASE_URL", "VERTEX_AI_BASE_URL", "VERTEX_AI_PUBLISHER"} {
+		if value, ok := os.LookupEnv(key); ok && strings.TrimSpace(value) != "" {
+			config[key] = value
+		}
+	}
+	return config
 }
 
 // Layer is one attached provider contribution.
@@ -455,7 +496,7 @@ func OmitProviderComposed(doc policy.Document) (policy.Document, int) {
 
 // EffectivePolicy is the OpenShell composition step: effective policy =
 // base + provider-composed profile entries (unless suppressProviders).
-func EffectivePolicy(base policy.Document, layers []Layer, suppressProviders bool) policy.Document {
+func composeProviderLayers(base policy.Document, layers []Layer, suppressProviders bool) policy.Document {
 	out := base
 	allows := append([]policy.AllowRule{}, out.NetworkAllows()...)
 	if out.Credentials == nil {
@@ -521,6 +562,92 @@ func EffectivePolicy(base policy.Document, layers []Layer, suppressProviders boo
 	}
 	out.SetNetworkAllows(allows)
 	return out
+}
+
+// EffectivePolicy composes provider endpoint credentials and resolves
+// sandbox-scoped OpenShell credential_binding references. Bindings fail closed
+// unless the named attached instance has an endpointless profile that declares
+// credential keys for guest injection and endpoint-scoped proxy rewriting.
+func EffectivePolicy(base policy.Document, layers []Layer, suppressProviders bool) (policy.Document, error) {
+	out := composeProviderLayers(base, layers, suppressProviders)
+	layersByName := make(map[string]Layer, len(layers))
+	for _, layer := range layers {
+		name := strings.TrimSpace(layer.InstanceName)
+		if name == "" {
+			return policy.Document{}, fmt.Errorf("provider composition: instance name required")
+		}
+		if _, exists := layersByName[name]; exists {
+			return policy.Document{}, fmt.Errorf("provider composition: duplicate attached provider instance %q", name)
+		}
+		layersByName[name] = layer
+	}
+
+	rules := out.NetworkAllows()
+	if out.Credentials == nil {
+		out.Credentials = &policy.Credentials{}
+	}
+	envSeen := make(map[string]struct{}, len(out.Credentials.EnvAllow))
+	for _, key := range out.Credentials.EnvAllow {
+		envSeen[key] = struct{}{}
+	}
+	for i := range rules {
+		binding := rules[i].CredentialBinding
+		if binding == nil {
+			continue
+		}
+		providerName := binding.Provider
+		layer, ok := layersByName[providerName]
+		if !ok {
+			return policy.Document{}, fmt.Errorf("credential_binding.provider %q is not attached to this sandbox", providerName)
+		}
+		if len(layer.Profile.Endpoints) != 0 {
+			return policy.Document{}, fmt.Errorf("credential_binding.provider %q must use an endpointless provider profile", providerName)
+		}
+		declared := layer.Profile.EnvKeys()
+		if len(declared) == 0 {
+			return policy.Document{}, fmt.Errorf("credential_binding.provider %q profile declares no credentials", providerName)
+		}
+		declaredSet := make(map[string]struct{}, len(declared))
+		for _, key := range declared {
+			declaredSet[key] = struct{}{}
+		}
+		keys := append([]string(nil), layer.EnvVars...)
+		if len(keys) == 0 {
+			keys = declared
+		}
+		selectedKeys := make(map[string]struct{}, len(keys))
+		boundKeys := make([]string, 0, len(keys))
+		for _, key := range keys {
+			key = strings.TrimSpace(key)
+			if _, ok := declaredSet[key]; !ok {
+				return policy.Document{}, fmt.Errorf("credential_binding.provider %q does not declare credential %q", providerName, key)
+			}
+			if _, duplicate := selectedKeys[key]; duplicate {
+				continue
+			}
+			selectedKeys[key] = struct{}{}
+			boundKeys = append(boundKeys, key)
+		}
+		if len(boundKeys) == 0 {
+			return policy.Document{}, fmt.Errorf("credential_binding.provider %q has no selected credentials", providerName)
+		}
+		rules[i].CredentialKeys = boundKeys
+		for _, key := range layer.Profile.GuestEnvKeys() {
+			if _, selected := selectedKeys[key]; !selected {
+				continue
+			}
+			if _, seen := envSeen[key]; seen {
+				continue
+			}
+			envSeen[key] = struct{}{}
+			out.Credentials.EnvAllow = append(out.Credentials.EnvAllow, key)
+		}
+	}
+	out.SetNetworkAllows(rules)
+	if err := out.Validate(); err != nil {
+		return policy.Document{}, err
+	}
+	return out, nil
 }
 
 // FindBuiltinDir locates a providers catalog directory (cwd or next to the executable).

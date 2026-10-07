@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/whaleshell/whaleshell-providers/actions/workflows/ci.yml"><img src="https://github.com/whaleshell/whaleshell-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pkg.go.dev/github.com/whaleshell/whaleshell-providers"><img src="https://pkg.go.dev/badge/github.com/whaleshell/whaleshell-providers.svg" alt="Go Reference"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License"></a>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
   <a href="https://github.com/whaleshell/whaleshell-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
@@ -17,6 +17,8 @@
 ---
 
 ## Overview
+
+For profile configuration and credential handling, see the [provider profile guide](https://whaleshell.github.io/guides/provider-profiles/).
 
 **whaleshell-providers** ships YAML provider profiles (Cursor, GitHub, NVIDIA, …) and composes them onto a base policy to produce the effective network/credential set a sandbox runs with.
 
@@ -33,9 +35,7 @@
 
 ## Installation
 
-```bash
-go get github.com/whaleshell/whaleshell-providers@latest
-```
+For now, build against sibling checkouts through `go.work` and run `go test ./...` here. Published versions need a coordinated dependency update before a standalone consumer build can be recommended.
 
 **Requirements:** Go 1.27+
 
@@ -51,14 +51,22 @@ import (
 
 base, _ := policy.Load("base.yaml")
 prof, _ := provider.LoadFile("profiles/cursor.yaml")
-effective := provider.EffectivePolicy(base, []provider.Layer{{
+effective, err := provider.EffectivePolicy(base, []provider.Layer{{
     InstanceName: "cursor",
     Profile:      prof,
 }}, false)
+if err != nil {
+    panic(err)
+}
 _ = effective
 ```
 
 Profiles: [`profiles/`](./profiles/).
+
+Host discovery uses only `discovery.credentials`, in declaration order, and
+collects all non-empty environment aliases. An empty discovery list discovers
+no credentials. `source` and `scope` are retained as export metadata; gateway
+storage determines their authoritative values.
 
 ---
 
@@ -83,4 +91,4 @@ Profiles: [`profiles/`](./profiles/).
 
 ## License
 
-[MIT](./LICENSE) © whaleshell
+[Apache-2.0](./LICENSE) © whaleshell
