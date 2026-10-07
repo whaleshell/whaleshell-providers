@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 lkmavi
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 id: nvidia
 display_name: NVIDIA
@@ -20,6 +20,8 @@ binaries:
   - /usr/bin/python3.13
   - /usr/local/bin/python
   - /sandbox/.venv/**
+discovery:
+  credentials: [api_key]
 credentials:
   - name: api_key
     env_vars: [NVIDIA_API_KEY]

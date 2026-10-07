@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 whaleshell
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 # Cursor Agent — OpenShell-style network-only profile.
 # L4 CONNECT tunnel only (no tls:terminate): Cursor Agent speaks HTTP/2 ALPN;
@@ -19,6 +19,8 @@ binaries:
   - /opt/cursor-agent/versions/*/cursor-agent
   - /usr/bin/curl
   - /usr/local/bin/curl
+discovery:
+  credentials: [api_key]
 credentials:
   - name: api_key
     env_vars: [CURSOR_API_KEY]

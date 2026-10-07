@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 whaleshell
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 # Builtin GitHub provider (OpenShell-style level C).
 # Host: export GITHUB_TOKEN=… (or GH_TOKEN). Values stay on the host;
@@ -14,6 +14,8 @@ binaries:
   - /usr/local/bin/gh
   - /usr/bin/git
   - /usr/local/bin/git
+discovery:
+  credentials: [api_token]
 credentials:
   - name: api_token
     env_vars: [GITHUB_TOKEN, GH_TOKEN]

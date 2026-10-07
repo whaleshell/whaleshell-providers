@@ -73,6 +73,8 @@ func TestOpenShellExtendedProfileFieldsRoundTrip(t *testing.T) {
 	input := []byte(`id: custom
 resource_version: 7
 annotations: {source: "migration"}
+source: user
+scope: workspace
 credentials:
   - name: api_key
     env_vars: [CUSTOM_API_KEY]
@@ -96,15 +98,29 @@ discovery:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.ResourceVersion != 7 || p.Annotations["source"] != "migration" || p.Credentials[0].Refresh.RefreshBeforeSeconds != 30 || p.Credentials[0].TokenGrant.AudienceOverrides[0].Audience != "api://custom" {
+	if p.ResourceVersion != 7 || p.Annotations["source"] != "migration" || p.Source != "user" || p.Scope != "workspace" || p.Credentials[0].Refresh.RefreshBeforeSeconds != 30 || p.Credentials[0].TokenGrant.AudienceOverrides[0].Audience != "api://custom" {
 		t.Fatalf("OpenShell fields lost: %+v", p)
 	}
 	b, err := yaml.Marshal(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ParseYAML(b); err != nil {
+	parsed, err := ParseYAML(b)
+	if err != nil {
 		t.Fatalf("marshaled profile did not parse: %v", err)
+	}
+	if parsed.Source != "user" || parsed.Scope != "workspace" {
+		t.Fatalf("server-set metadata lost on round-trip: source=%q scope=%q", parsed.Source, parsed.Scope)
+	}
+}
+
+func TestProfileParserAcceptsJSONConfiguration(t *testing.T) {
+	profile, err := ParseYAML([]byte(`{"id":"json-profile","display_name":"JSON profile","credentials":[{"name":"token","env_vars":["API_TOKEN"]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.ID != "json-profile" || profile.Credentials[0].EnvVars[0] != "API_TOKEN" {
+		t.Fatalf("JSON profile fields lost: %+v", profile)
 	}
 }
 
@@ -143,16 +159,29 @@ func TestProfileParserRejectsUnsupportedFields(t *testing.T) {
 	}
 }
 
-func TestRuntimeValidationReportsUnsupportedTokenGrant(t *testing.T) {
+func TestProfileParserRejectsMultipleYAMLDocuments(t *testing.T) {
+	input := []byte("id: openai\n---\nid: anthropic\n")
+	if _, err := ParseYAML(input); err == nil {
+		t.Fatal("ParseYAML accepted multiple profile documents")
+	}
+}
+
+func TestRuntimeValidationAcceptsImplementedTokenGrantAndRejectsMissingSubject(t *testing.T) {
 	profile := Profile{ID: "exchange", Credentials: []Credential{{
-		Name:       "access_token",
-		TokenGrant: &TokenGrant{GrantType: "token_exchange", TokenEndpoint: "https://issuer.example/token"},
+		Name: "access_token", EnvVars: []string{"ACCESS_TOKEN"},
+		TokenGrant: &TokenGrant{GrantType: "token_exchange", TokenEndpoint: "https://issuer.example/token", SubjectToken: &SubjectToken{Source: "provider_credential", Credential: "subject"}},
+	}, {
+		Name: "subject", EnvVars: []string{"UPSTREAM_TOKEN"},
 	}}}
 	if err := profile.Validate(); err != nil {
 		t.Fatalf("schema validation: %v", err)
 	}
-	if err := profile.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "credentials[0].token_grant") {
-		t.Fatalf("runtime validation should identify unsupported token_grant, got %v", err)
+	if err := profile.ValidateRuntime(); err != nil {
+		t.Fatalf("implemented token grant rejected: %v", err)
+	}
+	profile.Credentials[0].TokenGrant.SubjectToken.Credential = "missing"
+	if err := profile.ValidateRuntime(); err == nil || !strings.Contains(err.Error(), "subject credential") {
+		t.Fatalf("missing subject credential should be rejected, got %v", err)
 	}
 }
 
@@ -168,7 +197,7 @@ func TestProfileRejectsInsecurePublicTokenEndpoint(t *testing.T) {
 	}
 }
 
-func TestProfileRejectsL7CredentialInspectionWithTLSPassthrough(t *testing.T) {
+func TestProfileAcceptsDeprecatedTLSPassthroughAlias(t *testing.T) {
 	doc := []byte(`id: sample
 credentials:
   - name: api_key
@@ -180,8 +209,25 @@ endpoints:
     tls: passthrough
     access: read-write
 `)
-	if _, err := ParseYAML(doc); err == nil || !strings.Contains(err.Error(), "tls: terminate") {
-		t.Fatalf("expected fail-closed TLS validation, got %v", err)
+	profile, err := ParseYAML(doc)
+	if err != nil {
+		t.Fatalf("deprecated passthrough alias should remain accepted: %v", err)
+	}
+	if got := profile.Endpoints[0].TLS; got != "passthrough" {
+		t.Fatalf("tls alias changed during profile load: got %q", got)
+	}
+}
+
+func TestProfileRejectsSandboxScopedCredentialBinding(t *testing.T) {
+	doc := []byte(`id: database
+endpoints:
+  - host: db.example.com
+    port: 5432
+    credential_binding:
+      provider: attached-database
+`)
+	if _, err := ParseYAML(doc); err == nil || !strings.Contains(err.Error(), "sandbox-scoped") {
+		t.Fatalf("expected sandbox-scoped credential_binding rejection, got %v", err)
 	}
 }
 
@@ -199,7 +245,8 @@ func TestLoadDirRejectsDuplicateProfileIDs(t *testing.T) {
 
 func TestDiscoverEnvVars(t *testing.T) {
 	p := Profile{
-		ID: "github",
+		ID:        "github",
+		Discovery: Discovery{Credentials: []string{"api_token"}},
 		Credentials: []Credential{{
 			Name: "api_token", EnvVars: []string{"GITHUB_TOKEN", "GH_TOKEN"}, Required: true,
 		}},
@@ -213,9 +260,45 @@ func TestDiscoverEnvVars(t *testing.T) {
 	if len(keys) != 1 || keys[0] != "GH_TOKEN" {
 		t.Fatalf("%v", keys)
 	}
+	t.Setenv("GITHUB_TOKEN", "primary")
+	keys, err = p.DiscoverEnvVars()
+	if err != nil || len(keys) != 2 || keys[0] != "GITHUB_TOKEN" || keys[1] != "GH_TOKEN" {
+		t.Fatalf("all available aliases must be discovered: keys=%v err=%v", keys, err)
+	}
+	p.Discovery.Credentials = []string{" api_token "}
+	p.Credentials[0].Name = " api_token "
+	keys, err = p.DiscoverEnvVars()
+	if err != nil || len(keys) != 2 {
+		t.Fatalf("discovery names must be trimmed: keys=%v err=%v", keys, err)
+	}
+	p.Discovery.Credentials = nil
+	keys, err = p.DiscoverEnvVars()
+	if err != nil || len(keys) != 0 {
+		t.Fatalf("empty discovery must not scan credentials: keys=%v err=%v", keys, err)
+	}
+	p.Discovery.Credentials = []string{"api_token"}
+	t.Setenv("GITHUB_TOKEN", "")
 	t.Setenv("GH_TOKEN", "")
-	if _, err := p.DiscoverEnvVars(); err == nil {
-		t.Fatal("expected missing credential error")
+	if keys, err := p.DiscoverEnvVars(); err != nil || len(keys) != 0 {
+		t.Fatalf("missing required credential must not fail discovery: keys=%v err=%v", keys, err)
+	}
+}
+
+func TestOpenShellVertexConfigDiscovery(t *testing.T) {
+	for _, key := range []string{"VERTEX_AI_PROJECT_ID", "VERTEX_AI_REGION", "GOOGLE_VERTEX_AI_BASE_URL", "VERTEX_AI_BASE_URL", "VERTEX_AI_PUBLISHER"} {
+		t.Setenv(key, " ")
+	}
+	t.Setenv("VERTEX_AI_PROJECT_ID", "project-a")
+	t.Setenv("VERTEX_AI_REGION", "us-central1")
+	t.Setenv("VERTEX_AI_BASE_URL", "https://vertex.example")
+	p := Profile{ID: "google-vertex-ai"}
+	config := p.DiscoverConfig()
+	if len(config) != 3 || config["VERTEX_AI_PROJECT_ID"] != "project-a" || config["VERTEX_AI_REGION"] != "us-central1" || config["VERTEX_AI_BASE_URL"] != "https://vertex.example" {
+		t.Fatalf("Vertex discovery config=%v", config)
+	}
+	p.ID = "other"
+	if config := p.DiscoverConfig(); len(config) != 0 {
+		t.Fatalf("unrelated profiles must not discover Vertex configuration: %v", config)
 	}
 }
 
@@ -235,7 +318,10 @@ func TestEffectivePolicy(t *testing.T) {
 	if err := p.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	out := EffectivePolicy(base, []Layer{{InstanceName: "nv", Profile: p}}, false)
+	out, err := EffectivePolicy(base, []Layer{{InstanceName: "nv", Profile: p}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	allows := out.NetworkAllows()
 	if len(allows) != 1 {
 		t.Fatalf("allow=%d", len(allows))
@@ -253,9 +339,66 @@ func TestEffectivePolicy(t *testing.T) {
 		t.Fatalf("base mutated: %d", len(base.NetworkAllows()))
 	}
 	fresh := policy.Document{Version: 1}
-	suppressed := EffectivePolicy(fresh, []Layer{{InstanceName: "nv", Profile: p}}, true)
+	suppressed, err := EffectivePolicy(fresh, []Layer{{InstanceName: "nv", Profile: p}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(suppressed.NetworkAllows()) != 0 {
 		t.Fatalf("expected suppress, got %d", len(suppressed.NetworkAllows()))
+	}
+}
+
+func TestEffectivePolicyResolvesCredentialBinding(t *testing.T) {
+	base := policy.Document{Version: 1}
+	base.SetNetworkAllows([]policy.AllowRule{{
+		Host: "db.example.com", Port: 5432,
+		CredentialBinding: &policy.CredentialBinding{Provider: "database"},
+	}})
+	profile := Profile{
+		ID:          "database-credentials",
+		Credentials: []Credential{{Name: "db_token", EnvVars: []string{"DB_TOKEN"}}},
+	}
+	layer := Layer{InstanceName: "database", Profile: profile, EnvVars: []string{"DB_TOKEN"}}
+	out, err := EffectivePolicy(base, []Layer{layer}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := out.NetworkAllows()[0]
+	if len(rule.CredentialKeys) != 1 || rule.CredentialKeys[0] != "DB_TOKEN" {
+		t.Fatalf("endpoint credential keys=%v", rule.CredentialKeys)
+	}
+	if out.Credentials == nil || len(out.Credentials.EnvAllow) != 1 || out.Credentials.EnvAllow[0] != "DB_TOKEN" {
+		t.Fatalf("guest credential allowlist=%+v", out.Credentials)
+	}
+}
+
+func TestEffectivePolicyRejectsUnresolvableCredentialBinding(t *testing.T) {
+	base := policy.Document{Version: 1}
+	base.SetNetworkAllows([]policy.AllowRule{{
+		Host: "db.example.com", Port: 5432,
+		CredentialBinding: &policy.CredentialBinding{Provider: "database"},
+	}})
+	tests := []struct {
+		name   string
+		layers []Layer
+	}{
+		{name: "provider not attached"},
+		{name: "profile declares endpoints", layers: []Layer{{
+			InstanceName: "database",
+			Profile:      Profile{ID: "database", Endpoints: []policy.AllowRule{{Host: "db.example.com", Port: 5432}}, Credentials: []Credential{{Name: "db_token", EnvVars: []string{"DB_TOKEN"}}}},
+		}}},
+		{name: "credential key not declared", layers: []Layer{{
+			InstanceName: "database",
+			Profile:      Profile{ID: "database", Credentials: []Credential{{Name: "db_token", EnvVars: []string{"DB_TOKEN"}}}},
+			EnvVars:      []string{"OTHER_TOKEN"},
+		}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := EffectivePolicy(base, tt.layers, false); err == nil {
+				t.Fatal("expected credential binding to fail closed")
+			}
+		})
 	}
 }
 
@@ -284,7 +427,10 @@ func TestOmitProviderComposed(t *testing.T) {
 		},
 		Credentials: []Credential{{Name: "t", EnvVars: []string{"GITHUB_TOKEN"}}},
 	}
-	eff := EffectivePolicy(out, []Layer{{InstanceName: "gh", Profile: p}}, false)
+	eff, err := EffectivePolicy(out, []Layer{{InstanceName: "gh", Profile: p}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(eff.NetworkAllows()) != 2 {
 		t.Fatalf("effective allow=%d %+v", len(eff.NetworkAllows()), eff.NetworkAllows())
 	}
