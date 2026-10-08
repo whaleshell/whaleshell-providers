@@ -1,26 +1,26 @@
-<h1 align="center">whaleshell-providers</h1>
+<h1 align="center">cauteum-providers</h1>
 
 <p align="center">
   <strong>Provider catalog & compose</strong><br>
   Builtin provider profiles and effective-policy composition for sandboxes.
 </p>
 <p align="center">
-  <a href="https://github.com/whaleshell/whaleshell-providers/actions/workflows/ci.yml"><img src="https://github.com/whaleshell/whaleshell-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/whaleshell/whaleshell-providers"><img src="https://pkg.go.dev/badge/github.com/whaleshell/whaleshell-providers.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cauteum/cauteum-providers/actions/workflows/ci.yml"><img src="https://github.com/cauteum/cauteum-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cauteum/cauteum-providers"><img src="https://pkg.go.dev/badge/github.com/cauteum/cauteum-providers.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/whaleshell/whaleshell-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cauteum/cauteum-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
-  <sub>Part of the <a href="https://github.com/whaleshell">whaleshell / whaleshell</a> ecosystem</sub>
+  <sub>Part of the <a href="https://github.com/cauteum">cauteum / cauteum</a> ecosystem</sub>
 </p>
 
 ---
 
 ## Overview
 
-For profile configuration and credential handling, see the [provider profile guide](https://whaleshell.github.io/guides/provider-profiles/).
+For profile configuration and credential handling, see the [provider profile guide](https://cauteum.github.io/guides/provider-profiles/).
 
-**whaleshell-providers** ships YAML provider profiles (Cursor, GitHub, NVIDIA, …) and composes them onto a base policy to produce the effective network/credential set a sandbox runs with.
+**cauteum-providers** ships YAML provider profiles (Cursor, GitHub, NVIDIA, …) and composes them onto a base policy to produce the effective network/credential set a sandbox runs with.
 
 ### Key Features
 
@@ -45,8 +45,8 @@ For now, build against sibling checkouts through `go.work` and run `go test ./..
 
 ```go
 import (
-    "github.com/whaleshell/whaleshell-core/policy"
-    "github.com/whaleshell/whaleshell-providers/provider"
+    "github.com/cauteum/cauteum-core/policy"
+    "github.com/cauteum/cauteum-providers/provider"
 )
 
 base, _ := policy.Load("base.yaml")
@@ -85,10 +85,10 @@ storage determines their authoritative values.
 | Resource | Link |
 |----------|------|
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
-| Organization | [https://github.com/whaleshell](https://github.com/whaleshell) |
-| Organization overview | [github.com/whaleshell](https://github.com/whaleshell) |
-| pkg.go.dev | [`github.com/whaleshell/whaleshell-providers`](https://pkg.go.dev/github.com/whaleshell/whaleshell-providers) |
+| Organization | [https://github.com/cauteum](https://github.com/cauteum) |
+| Organization overview | [github.com/cauteum](https://github.com/cauteum) |
+| pkg.go.dev | [`github.com/cauteum/cauteum-providers`](https://pkg.go.dev/github.com/cauteum/cauteum-providers) |
 
 ## License
 
-[Apache-2.0](./LICENSE) © whaleshell
+[Apache-2.0](./LICENSE) © cauteum

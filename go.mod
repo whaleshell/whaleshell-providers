@@ -1,9 +1,9 @@
-module github.com/whaleshell/whaleshell-providers
+module github.com/cauteum/cauteum-providers
 
 go 1.27.0
 
 require (
-	github.com/whaleshell/whaleshell-core v0.1.0-alpha.2
+	github.com/cauteum/cauteum-core v0.1.0-alpha.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
