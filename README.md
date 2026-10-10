@@ -18,7 +18,7 @@
 
 ## Overview
 
-For profile configuration and credential handling, see the [provider profile guide](https://cauteum.github.io/guides/provider-profiles/).
+For profile configuration and credential handling, see the [provider profile guide](https://cauteum-haven.github.io/guides/provider-profiles/).
 
 **cauteum-providers** ships YAML provider profiles (Cursor, GitHub, NVIDIA, …) and composes them onto a base policy to produce the effective network/credential set a sandbox runs with.
 

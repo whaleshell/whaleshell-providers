@@ -1,6 +1,6 @@
 # Roadmap — cauteum-providers
 
-Status: **v0.1.0-alpha.2** (alpha) · Depends on [cauteum-core](https://github.com/cauteum-haven/cauteum-core) `v0.1.0-alpha.2`
+Status: **v0.1.2** (stable numbered release) · Depends on [cauteum-core](https://github.com/cauteum-haven/cauteum-core) `v0.1.0-alpha.2`
 
 ## This module
 
