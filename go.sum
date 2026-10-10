@@ -1,5 +1,5 @@
-github.com/cauteum/cauteum-core v0.1.0-beta.1.0.20261008213715-9b32ff965bef h1:AZMkFLGHQKRVzVDNqkeKClP87du39xuQML2gyrt9Zh0=
-github.com/cauteum/cauteum-core v0.1.0-beta.1.0.20261008213715-9b32ff965bef/go.mod h1:r3Cz9AedbxCZREqVYIrvH82TrwoF/Uw3aZqYj7QSFGM=
+github.com/cauteum/cauteum-core v0.1.0-beta.2 h1:XBMEDKj8OFruw+cj6MCAQoC8/aNZ+c90s2W8CEStjWE=
+github.com/cauteum/cauteum-core v0.1.0-beta.2/go.mod h1:5AGbBVlwFMIT2mDruFMxzekJT/Fx/kdQZvbEtbGCR3s=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/gobwas/glob v0.2.3 h1:A4xDbljILXROh+kObIiy5kIaPYD8e96x1tgBhUI5J+Y=
 github.com/gobwas/glob v0.2.3/go.mod h1:d3Ez4x06l9bZtSvzIay5+Yzi0fmZzPgnTbPcKjJAkT8=

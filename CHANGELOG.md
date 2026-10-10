@@ -8,6 +8,7 @@
 
 - Complete the Cauteum rebrand and pin the matching core source in CI.
 - Align CI and module tooling with Go 1.27.2.
+- Resolve `cauteum-core` from published v0.1.0-beta.2.
 
 ## [v0.1.0-alpha.2] - 2026-10-07
 
