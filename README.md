@@ -1,26 +1,26 @@
-<h1 align="center">cauteum-providers</h1>
+<h1 align="center">cautem-providers</h1>
 
 <p align="center">
   <strong>Provider catalog & compose</strong><br>
   Builtin provider profiles and effective-policy composition for sandboxes.
 </p>
 <p align="center">
-  <a href="https://github.com/cautem/cauteum-providers/actions/workflows/ci.yml"><img src="https://github.com/cautem/cauteum-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/cautem/cauteum-providers"><img src="https://pkg.go.dev/badge/github.com/cautem/cauteum-providers.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cautem/cautem-providers/actions/workflows/ci.yml"><img src="https://github.com/cautem/cautem-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cautem/cautem-providers"><img src="https://pkg.go.dev/badge/github.com/cautem/cautem-providers.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cautem/cauteum-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cautem/cautem-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
-  <sub>Part of the <a href="https://github.com/cautem">cauteum / cauteum</a> ecosystem</sub>
+  <sub>Part of the <a href="https://github.com/cautem">cautem / cautem</a> ecosystem</sub>
 </p>
 
 ---
 
 ## Overview
 
-For profile configuration and credential handling, see the [provider profile guide](https://cautem.github.io/cauteum-haven.github.io/guides/provider-profiles/).
+For profile configuration and credential handling, see the [provider profile guide](https://cautem.github.io/sandbox.dev/guides/provider-profiles/).
 
-**cauteum-providers** ships YAML provider profiles (Cursor, GitHub, NVIDIA, …) and composes them onto a base policy to produce the effective network/credential set a sandbox runs with.
+**cautem-providers** ships YAML provider profiles (Cursor, GitHub, NVIDIA, …) and composes them onto a base policy to produce the effective network/credential set a sandbox runs with.
 
 ### Key Features
 
@@ -45,8 +45,8 @@ For now, build against sibling checkouts through `go.work` and run `go test ./..
 
 ```go
 import (
-    "github.com/cautem/cauteum-core/policy"
-    "github.com/cautem/cauteum-providers/provider"
+    "github.com/cautem/cautem-core/policy"
+    "github.com/cautem/cautem-providers/provider"
 )
 
 base, _ := policy.Load("base.yaml")
@@ -87,8 +87,8 @@ storage determines their authoritative values.
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
 | Organization | [https://github.com/cautem](https://github.com/cautem) |
 | Organization overview | [github.com/cautem](https://github.com/cautem) |
-| pkg.go.dev | [`github.com/cautem/cauteum-providers`](https://pkg.go.dev/github.com/cautem/cauteum-providers) |
+| pkg.go.dev | [`github.com/cautem/cautem-providers`](https://pkg.go.dev/github.com/cautem/cautem-providers) |
 
 ## License
 
-[Apache-2.0](./LICENSE) © cauteum
+[Apache-2.0](./LICENSE) © cautem

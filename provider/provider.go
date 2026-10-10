@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cautem/cauteum-core/policy"
+	"github.com/cautem/cautem-core/policy"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,7 +40,7 @@ type Discovery struct {
 }
 
 // Credential declares env keys for an attached instance.
-// Values live in the gateway secret store; guests see cauteum:resolve:env:KEY
+// Values live in the gateway secret store; guests see cautem:resolve:env:KEY
 // placeholders unless InjectEnv is false (sidecar-only — Cursor OAuth path).
 type Credential struct {
 	Name         string             `yaml:"name" json:"name"`
@@ -227,7 +227,7 @@ func validateTokenEndpoint(raw string) error {
 	return fmt.Errorf("must use HTTPS (HTTP is allowed only for loopback or Kubernetes service DNS)")
 }
 
-// ValidateRuntime rejects accepted schema features that cauteum cannot execute
+// ValidateRuntime rejects accepted schema features that cautem cannot execute
 // so import/export compatibility never implies a working credential flow.
 func (p Profile) ValidateRuntime() error {
 	for i, credential := range p.Credentials {
@@ -250,7 +250,7 @@ func (p Profile) ValidateRuntime() error {
 					return fmt.Errorf("provider profile %q: credentials[%d].token_grant references undeclared subject credential %q", p.ID, i, credential.TokenGrant.SubjectToken.Credential)
 				}
 			default:
-				return fmt.Errorf("provider profile %q: credentials[%d].token_grant.grant_type %q is not supported by cauteum runtime", p.ID, i, credential.TokenGrant.GrantType)
+				return fmt.Errorf("provider profile %q: credentials[%d].token_grant.grant_type %q is not supported by cautem runtime", p.ID, i, credential.TokenGrant.GrantType)
 			}
 		}
 		if credential.Refresh == nil {
@@ -259,16 +259,16 @@ func (p Profile) ValidateRuntime() error {
 		switch credential.Refresh.Strategy {
 		case "oauth2_refresh_token", "oauth2_client_credentials", "oauth2-refresh-token", "oauth2-client-credentials":
 			if strings.TrimSpace(credential.Refresh.TokenURL) == "" {
-				return fmt.Errorf("provider profile %q: credentials[%d].refresh.token_url is required by cauteum runtime", p.ID, i)
+				return fmt.Errorf("provider profile %q: credentials[%d].refresh.token_url is required by cautem runtime", p.ID, i)
 			}
 		case "aws_sts_assume_role", "aws-sts-assume-role", "google_service_account_jwt", "google-service-account-jwt":
 		default:
-			return fmt.Errorf("provider profile %q: credentials[%d].refresh.strategy %q is not supported by cauteum runtime", p.ID, i, credential.Refresh.Strategy)
+			return fmt.Errorf("provider profile %q: credentials[%d].refresh.strategy %q is not supported by cautem runtime", p.ID, i, credential.Refresh.Strategy)
 		}
 	}
 	for i, endpoint := range p.Endpoints {
 		if endpoint.CredentialSigning != "" {
-			return fmt.Errorf("provider profile %q: endpoints[%d].credential_signing is not supported by cauteum runtime", p.ID, i)
+			return fmt.Errorf("provider profile %q: endpoints[%d].credential_signing is not supported by cautem runtime", p.ID, i)
 		}
 	}
 	return nil
@@ -302,7 +302,7 @@ func ParseYAML(b []byte) (Profile, error) {
 		return Profile{}, fmt.Errorf("provider profile: parse trailing document: %w", err)
 	}
 	// OpenShell omits TLS handling on L7 HTTPS endpoints and defaults them to
-	// inspection. Apply that default before cauteum policy validation.
+	// inspection. Apply that default before cautem policy validation.
 	for i := range p.Endpoints {
 		if p.Endpoints[i].TLS == "" && p.Endpoints[i].Protocol != "" && p.Endpoints[i].Port == 443 {
 			p.Endpoints[i].TLS = "terminate"
@@ -389,7 +389,7 @@ func (p Profile) DiscoveryCredentials() []Credential {
 }
 
 // GuestEnvKeys returns credential env keys that should be injected into the guest
-// as cauteum:resolve:env placeholders (excludes inject_env: false).
+// as cautem:resolve:env placeholders (excludes inject_env: false).
 func (p Profile) GuestEnvKeys() []string {
 	var out []string
 	seen := map[string]struct{}{}
@@ -434,7 +434,7 @@ func (p Profile) DiscoverEnvVars() ([]string, error) {
 			seen[k] = struct{}{}
 			if v, ok := os.LookupEnv(k); ok && strings.TrimSpace(v) != "" {
 				// Host may leak guest placeholders into the process env — treat as missing.
-				if strings.HasPrefix(strings.TrimSpace(v), "cauteum:resolve:env:") ||
+				if strings.HasPrefix(strings.TrimSpace(v), "cautem:resolve:env:") ||
 					strings.HasPrefix(strings.TrimSpace(v), "openshell:resolve:env:") {
 					continue
 				}
@@ -655,8 +655,8 @@ func FindBuiltinDir() string {
 	candidates := []string{}
 	if wd, err := os.Getwd(); err == nil {
 		candidates = append(candidates,
-			filepath.Join(wd, "cauteum-providers", "profiles"),
-			filepath.Join(wd, "cauteum-cli", "providers"),
+			filepath.Join(wd, "cautem-providers", "profiles"),
+			filepath.Join(wd, "cautem-cli", "providers"),
 			filepath.Join(wd, "providers"),
 			filepath.Join(wd, "profiles"),
 		)
@@ -668,8 +668,8 @@ func FindBuiltinDir() string {
 			filepath.Join(dir, "providers"),
 			filepath.Join(dir, "..", "profiles"),
 			filepath.Join(dir, "..", "providers"),
-			filepath.Join(dir, "..", "cauteum-providers", "profiles"),
-			filepath.Join(dir, "..", "cauteum-cli", "providers"),
+			filepath.Join(dir, "..", "cautem-providers", "profiles"),
+			filepath.Join(dir, "..", "cautem-cli", "providers"),
 		)
 	}
 	for _, c := range candidates {
