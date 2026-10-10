@@ -5,13 +5,13 @@
   Builtin provider profiles and effective-policy composition for sandboxes.
 </p>
 <p align="center">
-  <a href="https://github.com/cauteum/cauteum-providers/actions/workflows/ci.yml"><img src="https://github.com/cauteum/cauteum-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/cauteum/cauteum-providers"><img src="https://pkg.go.dev/badge/github.com/cauteum/cauteum-providers.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cauteum-haven/cauteum-providers/actions/workflows/ci.yml"><img src="https://github.com/cauteum-haven/cauteum-providers/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cauteum-haven/cauteum-providers"><img src="https://pkg.go.dev/badge/github.com/cauteum-haven/cauteum-providers.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cauteum/cauteum-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cauteum-haven/cauteum-providers"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
-  <sub>Part of the <a href="https://github.com/cauteum">cauteum / cauteum</a> ecosystem</sub>
+  <sub>Part of the <a href="https://github.com/cauteum-haven">cauteum / cauteum</a> ecosystem</sub>
 </p>
 
 ---
@@ -45,8 +45,8 @@ For now, build against sibling checkouts through `go.work` and run `go test ./..
 
 ```go
 import (
-    "github.com/cauteum/cauteum-core/policy"
-    "github.com/cauteum/cauteum-providers/provider"
+    "github.com/cauteum-haven/cauteum-core/policy"
+    "github.com/cauteum-haven/cauteum-providers/provider"
 )
 
 base, _ := policy.Load("base.yaml")
@@ -85,9 +85,9 @@ storage determines their authoritative values.
 | Resource | Link |
 |----------|------|
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
-| Organization | [https://github.com/cauteum](https://github.com/cauteum) |
-| Organization overview | [github.com/cauteum](https://github.com/cauteum) |
-| pkg.go.dev | [`github.com/cauteum/cauteum-providers`](https://pkg.go.dev/github.com/cauteum/cauteum-providers) |
+| Organization | [https://github.com/cauteum](https://github.com/cauteum-haven) |
+| Organization overview | [github.com/cauteum](https://github.com/cauteum-haven) |
+| pkg.go.dev | [`github.com/cauteum-haven/cauteum-providers`](https://pkg.go.dev/github.com/cauteum-haven/cauteum-providers) |
 
 ## License
 
