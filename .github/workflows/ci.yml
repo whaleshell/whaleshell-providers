@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 the cauteum authors
+# SPDX-FileCopyrightText: Copyright (c) 2026 the cautem authors
 # SPDX-License-Identifier: Apache-2.0
 #
 # gogpu-style CI: format, lint, cross-platform build + test
@@ -24,20 +24,20 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: cauteum-providers
+        working-directory: cautem-providers
     steps:
 
-      - name: Checkout cauteum-providers
+      - name: Checkout cautem-providers
         uses: actions/checkout@v4
         with:
-          path: cauteum-providers
+          path: cautem-providers
 
-      - name: Checkout cauteum-core
+      - name: Checkout cautem-core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cauteum-core
-          path: cauteum-core
-          ref: 683b09a16a93e93ca860ea0c723baa369a3b5c75
+          repository: cautem/cautem-core
+          path: cautem-core
+          ref: v0.1.6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -47,17 +47,17 @@ jobs:
           {
             echo 'go 1.27.0'
             echo 'use ('
-            for d in cauteum-* slogx; do
+            for d in cautem-* slogx; do
               if [[ -d "$d" ]]; then
                 echo "  ./$d"
               fi
             done
             echo ')'
             echo 'replace ('
-            for d in cauteum-*; do
+            for d in cautem-*; do
               if [[ -d "$d" ]]; then
                 echo "  github.com/cautem/${d} v0.1.0-alpha.1 => ./$d"
-                echo "  github.com/cautem/${d} v0.1.5 => ./$d"
+                echo "  github.com/cautem/${d} v0.1.6 => ./$d"
                 echo "  github.com/cautem/${d} v0.1.0-alpha.2 => ./$d"
               fi
             done
@@ -75,7 +75,7 @@ jobs:
           go-version: "1.27.2"
           cache: true
           cache-dependency-path: |
-            cauteum-*/go.sum
+            cautem-*/go.sum
             slogx/go.sum
       - name: Check gofmt
         run: |
@@ -93,20 +93,20 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: cauteum-providers
+        working-directory: cautem-providers
     steps:
 
-      - name: Checkout cauteum-providers
+      - name: Checkout cautem-providers
         uses: actions/checkout@v4
         with:
-          path: cauteum-providers
+          path: cautem-providers
 
-      - name: Checkout cauteum-core
+      - name: Checkout cautem-core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cauteum-core
-          path: cauteum-core
-          ref: 683b09a16a93e93ca860ea0c723baa369a3b5c75
+          repository: cautem/cautem-core
+          path: cautem-core
+          ref: v0.1.6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -116,17 +116,17 @@ jobs:
           {
             echo 'go 1.27.0'
             echo 'use ('
-            for d in cauteum-* slogx; do
+            for d in cautem-* slogx; do
               if [[ -d "$d" ]]; then
                 echo "  ./$d"
               fi
             done
             echo ')'
             echo 'replace ('
-            for d in cauteum-*; do
+            for d in cautem-*; do
               if [[ -d "$d" ]]; then
                 echo "  github.com/cautem/${d} v0.1.0-alpha.1 => ./$d"
-                echo "  github.com/cautem/${d} v0.1.5 => ./$d"
+                echo "  github.com/cautem/${d} v0.1.6 => ./$d"
                 echo "  github.com/cautem/${d} v0.1.0-alpha.2 => ./$d"
               fi
             done
@@ -144,13 +144,13 @@ jobs:
           go-version: "1.27.2"
           cache: true
           cache-dependency-path: |
-            cauteum-*/go.sum
+            cautem-*/go.sum
             slogx/go.sum
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.14.0
-          working-directory: cauteum-providers
+          working-directory: cautem-providers
           args: --timeout=5m
 
   build:
@@ -162,20 +162,20 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     defaults:
       run:
-        working-directory: cauteum-providers
+        working-directory: cautem-providers
     steps:
 
-      - name: Checkout cauteum-providers
+      - name: Checkout cautem-providers
         uses: actions/checkout@v4
         with:
-          path: cauteum-providers
+          path: cautem-providers
 
-      - name: Checkout cauteum-core
+      - name: Checkout cautem-core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cauteum-core
-          path: cauteum-core
-          ref: 683b09a16a93e93ca860ea0c723baa369a3b5c75
+          repository: cautem/cautem-core
+          path: cautem-core
+          ref: v0.1.6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -185,17 +185,17 @@ jobs:
           {
             echo 'go 1.27.0'
             echo 'use ('
-            for d in cauteum-* slogx; do
+            for d in cautem-* slogx; do
               if [[ -d "$d" ]]; then
                 echo "  ./$d"
               fi
             done
             echo ')'
             echo 'replace ('
-            for d in cauteum-*; do
+            for d in cautem-*; do
               if [[ -d "$d" ]]; then
                 echo "  github.com/cautem/${d} v0.1.0-alpha.1 => ./$d"
-                echo "  github.com/cautem/${d} v0.1.5 => ./$d"
+                echo "  github.com/cautem/${d} v0.1.6 => ./$d"
                 echo "  github.com/cautem/${d} v0.1.0-alpha.2 => ./$d"
               fi
             done
@@ -213,7 +213,7 @@ jobs:
           go-version: "1.27.2"
           cache: true
           cache-dependency-path: |
-            cauteum-*/go.sum
+            cautem-*/go.sum
             slogx/go.sum
       - name: Download modules
         run: go mod download
@@ -229,20 +229,20 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     defaults:
       run:
-        working-directory: cauteum-providers
+        working-directory: cautem-providers
     steps:
 
-      - name: Checkout cauteum-providers
+      - name: Checkout cautem-providers
         uses: actions/checkout@v4
         with:
-          path: cauteum-providers
+          path: cautem-providers
 
-      - name: Checkout cauteum-core
+      - name: Checkout cautem-core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cauteum-core
-          path: cauteum-core
-          ref: 683b09a16a93e93ca860ea0c723baa369a3b5c75
+          repository: cautem/cautem-core
+          path: cautem-core
+          ref: v0.1.6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -252,17 +252,17 @@ jobs:
           {
             echo 'go 1.27.0'
             echo 'use ('
-            for d in cauteum-* slogx; do
+            for d in cautem-* slogx; do
               if [[ -d "$d" ]]; then
                 echo "  ./$d"
               fi
             done
             echo ')'
             echo 'replace ('
-            for d in cauteum-*; do
+            for d in cautem-*; do
               if [[ -d "$d" ]]; then
                 echo "  github.com/cautem/${d} v0.1.0-alpha.1 => ./$d"
-                echo "  github.com/cautem/${d} v0.1.5 => ./$d"
+                echo "  github.com/cautem/${d} v0.1.6 => ./$d"
                 echo "  github.com/cautem/${d} v0.1.0-alpha.2 => ./$d"
               fi
             done
@@ -280,7 +280,7 @@ jobs:
           go-version: "1.27.2"
           cache: true
           cache-dependency-path: |
-            cauteum-*/go.sum
+            cautem-*/go.sum
             slogx/go.sum
       - name: Download modules
         run: go mod download
@@ -308,7 +308,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
-          files: ./cauteum-providers/coverage.txt
+          files: ./cautem-providers/coverage.txt
           flags: unittests
-          name: codecov-cauteum-providers
+          name: codecov-cautem-providers
           fail_ci_if_error: false
