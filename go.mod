@@ -1,11 +1,11 @@
-module github.com/cauteum-haven/cauteum-providers
+module github.com/cautem/cauteum-providers
 
 go 1.27.0
 
 toolchain go1.27.2
 
 require (
-	github.com/cauteum-haven/cauteum-core v0.1.4
+	github.com/cautem/cauteum-core v0.1.5
 	gopkg.in/yaml.v3 v3.0.1
 )
 

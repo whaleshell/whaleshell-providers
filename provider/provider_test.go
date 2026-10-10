@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cauteum-haven/cauteum-core/policy"
+	"github.com/cautem/cauteum-core/policy"
 	"gopkg.in/yaml.v3"
 )
 
